@@ -1,3 +1,14 @@
+"""
+Multiple Sequence Alignment (MSA) Analysis Tool
+-----------------------------------------------
+Program ini mengimplementasikan dan membandingkan berbagai algoritma penyelarasan
+multipel sekuens (MSA) untuk analisis protein.
+
+Author: [Nama Anda]
+Email: mzaidan100703@gmail.com
+Date: April 2025
+"""
+
 import os
 import time
 import numpy as np
@@ -11,7 +22,30 @@ from Bio.Seq import Seq
 
 # Konfigurasi awal
 OUTPUT_DIR = "output"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def setup_output_directories():
+    """
+    Membuat struktur direktori output terorganisir per protein dan jenis analisis
+    """
+    # Direktori utama
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    # Direktori per protein
+    protein_dirs = ["cytochrome_c", "histone_h4", "hsp70"]
+    for protein in protein_dirs:
+        protein_path = os.path.join(OUTPUT_DIR, protein)
+        os.makedirs(protein_path, exist_ok=True)
+        
+        # Subdirektori per jenis analisis
+        analysis_dirs = ["alignment", "phylogeny", "conservation", "statistics"]
+        for analysis in analysis_dirs:
+            os.makedirs(os.path.join(protein_path, analysis), exist_ok=True)
+    
+    # Direktori untuk hasil ringkasan
+    summary_path = os.path.join(OUTPUT_DIR, "summary")
+    os.makedirs(summary_path, exist_ok=True)
+    
+    return protein_dirs
 
 # Email untuk NCBI Entrez (wajib)
 Entrez.email = "mzaidan100703@gmail.com"
@@ -26,7 +60,7 @@ def download_protein_sequences(protein_name, taxonomic_range, num_sequences=20, 
     
     if output_file is None:
         protein_name_safe = protein_name.replace(" ", "_").lower()
-        output_file = os.path.join(OUTPUT_DIR, f"{protein_name_safe}_{taxonomic_range.lower()}.fasta")
+        output_file = os.path.join(OUTPUT_DIR, protein_name_safe, f"{protein_name_safe}.fasta")
     
     # Mencari protein di database
     query = f"{protein_name}[Protein Name] AND {taxonomic_range}[Organism]"
@@ -53,7 +87,8 @@ def generate_test_sequences(output_file=None):
     Membuat data test sederhana jika tidak bisa mengakses NCBI
     """
     if output_file is None:
-        output_file = os.path.join(OUTPUT_DIR, "test_sequences.fasta")
+        output_file = os.path.join(OUTPUT_DIR, "test", "test_sequences.fasta")
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
     # Sekuens protein hipotetis dengan beberapa mutasi
     # Cytochrome C-like sequences with conservation patterns
@@ -75,6 +110,7 @@ def generate_test_sequences(output_file=None):
     print(f"Generated {len(sequences)} test sequences to {output_file}")
     return output_file
 
+
 # ==================== 2. MSA IMPLEMENTATION WITHOUT EXTERNAL TOOLS ====================
 
 def align_with_python(input_file, method="simple", output_file=None):
@@ -89,9 +125,15 @@ def align_with_python(input_file, method="simple", output_file=None):
     Returns:
         Objek MultipleSeqAlignment
     """
+    # Ekstrak nama protein dari input_file
+    protein_name = os.path.basename(os.path.dirname(input_file)) if os.path.dirname(input_file) else "unknown"
+    
     if output_file is None:
         base = os.path.splitext(os.path.basename(input_file))[0]
-        output_file = os.path.join(OUTPUT_DIR, f"{base}_{method}.aln")
+        output_file = os.path.join(OUTPUT_DIR, protein_name, "alignment", f"{base}_{method}.aln")
+    
+    # Pastikan direktori output ada
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
     print(f"Running {method} alignment on {input_file}...")
     start_time = time.time()
@@ -427,12 +469,20 @@ def build_phylogenetic_tree(alignment, output_file=None):
     """
     Membangun pohon filogenetik dari alignment menggunakan metode distance
     """
+    # Dapatkan nama protein dari alignment
+    protein_name = "unknown"
+    if output_file and os.path.dirname(output_file):
+        protein_name = os.path.basename(os.path.dirname(os.path.dirname(output_file)))
+    
     if output_file is None:
-        # Generate output filename based on alignment info
+        # Generate output filename berdasarkan informasi alignment
         base = "phylogenetic_tree"
         for record in alignment[:1]:  # Ambil info dari record pertama
             base = record.id.split('...')[0]
-        output_file = os.path.join(OUTPUT_DIR, f"{base}_tree.newick")
+        output_file = os.path.join(OUTPUT_DIR, protein_name, "phylogeny", f"{base}_tree.newick")
+    
+    # Pastikan direktori output ada
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     
     print(f"Building phylogenetic tree...")
     
@@ -467,18 +517,22 @@ def build_phylogenetic_tree(alignment, output_file=None):
         print(f"Created a simple fallback tree. Saved to {output_file}")
         
         return tree
+    
 
 # ==================== 5. VISUALIZATION FUNCTIONS ====================
 
 def visualize_tree(tree, title, output_file):
     """
-    Visualisasi pohon filogenetik
+    Visualisasi pohon filogenetik dengan output terorganisir
     """
+    # Pastikan direktori output ada
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
     try:
         plt.figure(figsize=(10, len(tree.get_terminals()) * 0.5 + 3))
         Phylo.draw(tree, do_show=False, label_func=lambda x: x.name)
         plt.title(title)
-        plt.savefig(output_file)
+        plt.savefig(output_file, dpi=300)
         plt.close()
         print(f"Tree visualization saved to {output_file}")
     except Exception as e:
@@ -488,6 +542,9 @@ def visualize_alignment(alignment, title, output_file):
     """
     Visualisasi alignment sebagai heatmap dengan informasi konservasi yang ditingkatkan
     """
+    # Pastikan direktori output ada
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
     try:
         # Konversi alignment ke matriks numerik
         # Kita akan menggunakan indeks alfabet sebagai nilai numerik
@@ -566,11 +623,13 @@ def visualize_alignment(alignment, title, output_file):
     except Exception as e:
         print(f"Error visualizing alignment: {e}")
 
-
 def compare_alignment_methods(alignments, method_names, title, output_file):
     """
     Bandingkan berbagai metode alignment dengan visualisasi yang ditingkatkan
     """
+    # Pastikan direktori output ada
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
     try:
         # Dapatkan konservasi untuk setiap metode
         all_conservation = []
@@ -671,11 +730,13 @@ def compare_alignment_methods(alignments, method_names, title, output_file):
     except Exception as e:
         print(f"Error comparing alignments: {e}")
 
-
 def create_summary_visualization(all_results, output_file):
     """
     Membuat visualisasi ringkasan untuk semua protein dan metode
     """
+    # Pastikan direktori output ada
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
     try:
         proteins = list(all_results.keys())
         methods = []
@@ -740,11 +801,12 @@ def create_summary_visualization(all_results, output_file):
     except Exception as e:
         print(f"Error creating summary visualization: {e}")
 
+
 # ==================== 6. MAIN WORKFLOW ====================
 
 def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=None):
     """
-    Menjalankan analisis MSA untuk satu protein
+    Menjalankan analisis MSA untuk satu protein dengan output terorganisir
     """
     if methods is None:
         methods = ["simple", "center_star", "progressive"]
@@ -753,17 +815,29 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
     print(f"ANALYZING {protein_name} FOR {taxonomic_range}")
     print(f"{'='*60}")
     
+    # Buat folder spesifik untuk protein ini
+    protein_safe_name = protein_name.replace(" ", "_").lower()
+    if protein_safe_name == "heat_shock_protein_70":
+        protein_safe_name = "hsp70"  # Alias untuk nama yang lebih pendek
+        
+    protein_dir = os.path.join(OUTPUT_DIR, protein_safe_name)
+    
+    # Pastikan direktori ada
+    for subdir in ["alignment", "phylogeny", "conservation", "statistics"]:
+        os.makedirs(os.path.join(protein_dir, subdir), exist_ok=True)
+    
     # Download atau gunakan file FASTA yang diberikan
     if fasta_file is None:
         try:
-            fasta_file = download_protein_sequences(protein_name, taxonomic_range, num_sequences=10)
+            fasta_file = download_protein_sequences(protein_name, taxonomic_range, num_sequences=10,
+                                                  output_file=os.path.join(protein_dir, f"{protein_safe_name}.fasta"))
             if fasta_file is None:
                 print(f"Failed to download {protein_name} sequences. Generating test data instead.")
-                fasta_file = generate_test_sequences()
+                fasta_file = generate_test_sequences(os.path.join(protein_dir, f"{protein_safe_name}_test.fasta"))
         except Exception as e:
             print(f"Error downloading sequences: {e}")
             print("Generating test data instead.")
-            fasta_file = generate_test_sequences()
+            fasta_file = generate_test_sequences(os.path.join(protein_dir, f"{protein_safe_name}_test.fasta"))
     
     # Jalankan algoritma alignment
     alignments = {}
@@ -771,8 +845,7 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
     
     for method in methods:
         try:
-            prefix = f"{protein_name.replace(' ', '_').lower()}_{taxonomic_range.lower()}"
-            output_file = os.path.join(OUTPUT_DIR, f"{prefix}_{method}.aln")
+            output_file = os.path.join(protein_dir, "alignment", f"{protein_safe_name}_{method}.aln")
             alignment, time_taken = align_with_python(fasta_file, method, output_file)
             alignments[method] = alignment
             execution_times[method] = time_taken
@@ -791,11 +864,10 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
         biological_scores[method] = calculate_biological_score(alignment)
         
         # Visualisasi alignment
-        prefix = f"{protein_name.replace(' ', '_').lower()}_{taxonomic_range.lower()}"
         visualize_alignment(
             alignment,
             f"{protein_name} Alignment ({method})",
-            os.path.join(OUTPUT_DIR, f"{prefix}_{method}_align.png")
+            os.path.join(protein_dir, "alignment", f"{protein_safe_name}_{method}_align.png")
         )
     
     # Bandingkan metode alignment
@@ -804,7 +876,7 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
             list(alignments.values()),
             list(alignments.keys()),
             f"Conservation Comparison for {protein_name}",
-            os.path.join(OUTPUT_DIR, f"{prefix}_conservation_comparison.png")
+            os.path.join(protein_dir, "conservation", f"{protein_safe_name}_conservation_comparison.png")
         )
     
     # Bangun dan visualisasi pohon filogenetik untuk metode terbaik
@@ -813,11 +885,11 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
         best_method = max(biological_scores, key=biological_scores.get)
         best_alignment = alignments[best_method]
         
-        tree_file = os.path.join(OUTPUT_DIR, f"{prefix}_{best_method}_tree.newick")
+        tree_file = os.path.join(protein_dir, "phylogeny", f"{protein_safe_name}_{best_method}_tree.newick")
         tree = build_phylogenetic_tree(best_alignment, tree_file)
         
         if tree:
-            tree_img = os.path.join(OUTPUT_DIR, f"{prefix}_{best_method}_tree.png")
+            tree_img = os.path.join(protein_dir, "phylogeny", f"{protein_safe_name}_{best_method}_tree.png")
             visualize_tree(tree, f"{protein_name} Phylogeny (Best: {best_method})", tree_img)
     
     # Create performance comparison plot
@@ -841,7 +913,7 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
                 ha='center', va='bottom'
             )
         
-        plt.savefig(os.path.join(OUTPUT_DIR, f"{prefix}_performance.png"))
+        plt.savefig(os.path.join(protein_dir, "statistics", f"{protein_safe_name}_performance.png"))
         plt.close()
     
     # Create biological score comparison
@@ -866,7 +938,7 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
                 ha='center', va='bottom'
             )
         
-        plt.savefig(os.path.join(OUTPUT_DIR, f"{prefix}_biological_scores.png"))
+        plt.savefig(os.path.join(protein_dir, "statistics", f"{protein_safe_name}_biological_scores.png"))
         plt.close()
     
     return {
@@ -876,12 +948,13 @@ def run_msa_analysis(protein_name, taxonomic_range, fasta_file=None, methods=Non
         "execution_times": execution_times
     }
 
-# ==================== EXECUTION ====================
+
+# ==================== 7. MAIN EXECUTION ====================
 
 if __name__ == "__main__":
-    # Buat direktori output jika belum ada
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
+    # Setup direktori output
+    protein_dirs = setup_output_directories()
+    Entrez.email = "mzaidan100703@gmail.com"  # Gunakan email Anda
     
     # Informasi bantuan instalasi
     print("\n======== INFORMASI PROGRAM INTERNAL ========")
@@ -890,12 +963,12 @@ if __name__ == "__main__":
     print("1. Simple - Menyelaraskan sekuens berdasarkan panjang (sederhana)")
     print("2. Center Star - Memilih sekuens tengah dan menyelaraskan yang lain terhadapnya")
     print("3. Progressive - Menyelaraskan sekuens secara progresif berdasarkan panjang")
+    print("Output akan disimpan dalam folder terpisah untuk masing-masing protein.")
     print("Untuk hasil yang lebih akurat, sebaiknya instal program eksternal seperti ClustalW.\n")
     
     # Uji koneksi ke NCBI
     try:
         print("Menguji koneksi ke NCBI...")
-        Entrez.email = "test@example.com"
         handle = Entrez.einfo()
         record = Entrez.read(handle)
         handle.close()
@@ -914,10 +987,14 @@ if __name__ == "__main__":
         # Jalankan analisis untuk setiap protein
         for protein_name, taxonomic_range in zip(proteins, taxonomies):
             try:
+                protein_safe_name = protein_name.replace(" ", "_").lower()
+                if protein_safe_name == "heat_shock_protein_70":
+                    protein_safe_name = "hsp70"
+                
                 result = run_msa_analysis(protein_name, taxonomic_range, methods=methods)
                 
                 # Simpan hasil
-                protein_key = f"{protein_name}_{taxonomic_range}"
+                protein_key = protein_safe_name
                 all_results[protein_key] = result["results"]
                 all_biological_scores[protein_key] = result["biological_scores"]
                 all_execution_times[protein_key] = result["execution_times"]
@@ -925,66 +1002,85 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Error analyzing {protein_name} for {taxonomic_range}: {e}")
         
-        # Simpan hasil ke CSV
-        try:
-            # Biological scores
-            bio_scores_data = []
-            for protein_key, methods_scores in all_biological_scores.items():
-                for method, score in methods_scores.items():
-                    bio_scores_data.append({
-                        "Protein": protein_key,
-                        "Method": method,
-                        "Biological Score": score
-                    })
-            
+        # Simpan hasil ringkasan ke CSV
+        summary_dir = os.path.join(OUTPUT_DIR, "summary")
+        os.makedirs(summary_dir, exist_ok=True)
+        
+        # Biological scores
+        bio_scores_data = []
+        for protein_key, methods_scores in all_biological_scores.items():
+            for method, score in methods_scores.items():
+                bio_scores_data.append({
+                    "Protein": protein_key,
+                    "Method": method,
+                    "Biological Score": score
+                })
+        
+        if bio_scores_data:
             bio_scores_df = pd.DataFrame(bio_scores_data)
-            bio_scores_file = os.path.join(OUTPUT_DIR, "biological_scores.csv")
+            bio_scores_file = os.path.join(summary_dir, "biological_scores.csv")
             bio_scores_df.to_csv(bio_scores_file, index=False)
             print(f"Saved all biological scores to {bio_scores_file}")
-            
-            # Execution times
-            exec_times_data = []
-            for protein_key, methods_times in all_execution_times.items():
-                for method, time_taken in methods_times.items():
-                    exec_times_data.append({
-                        "Protein": protein_key,
-                        "Method": method,
-                        "Execution Time (s)": time_taken
-                    })
-            
+        
+        # Execution times
+        exec_times_data = []
+        for protein_key, methods_times in all_execution_times.items():
+            for method, time_taken in methods_times.items():
+                exec_times_data.append({
+                    "Protein": protein_key,
+                    "Method": method,
+                    "Execution Time (s)": time_taken
+                })
+        
+        if exec_times_data:
             exec_times_df = pd.DataFrame(exec_times_data)
-            exec_times_file = os.path.join(OUTPUT_DIR, "execution_times.csv")
+            exec_times_file = os.path.join(summary_dir, "execution_times.csv")
             exec_times_df.to_csv(exec_times_file, index=False)
             print(f"Saved all execution times to {exec_times_file}")
-            
-            # Create summary plot
-            plt.figure(figsize=(12, 8))
-            
-            # Use pivot table for easier plotting
-            pivot_scores = bio_scores_df.pivot(index="Method", columns="Protein", values="Biological Score")
-            pivot_scores.plot(kind="bar", ax=plt.gca())
-            
-            plt.title("Biological Scores Comparison Across Proteins and Methods")
-            plt.xlabel("Method")
-            plt.ylabel("Biological Score")
-            plt.ylim(0, 1)
-            plt.legend(title="Protein")
-            plt.grid(axis='y', linestyle='--', alpha=0.7)
-            plt.tight_layout()
-            
-            plt.savefig(os.path.join(OUTPUT_DIR, "summary_biological_scores.png"))
-            plt.close()
-            print(f"Created summary plots in {OUTPUT_DIR}")
-            
-        except Exception as e:
-            print(f"Error saving results: {e}")
         
+        # Create summary plots
+        if all_results:
+            # Conservation summary
+            create_summary_visualization(
+                all_results,
+                os.path.join(summary_dir, "conservation_summary.png")
+            )
+            
+            # Biological score comparison
+            if bio_scores_data:
+                plt.figure(figsize=(12, 8))
+                
+                # Use pivot table for easier plotting
+                pivot_scores = bio_scores_df.pivot(index="Method", columns="Protein", values="Biological Score")
+                pivot_scores.plot(kind="bar", ax=plt.gca())
+                
+                plt.title("Biological Scores Comparison Across Proteins and Methods")
+                plt.xlabel("Method")
+                plt.ylabel("Biological Score")
+                plt.ylim(0, 1)
+                plt.legend(title="Protein")
+                plt.grid(axis='y', linestyle='--', alpha=0.7)
+                plt.tight_layout()
+                
+                plt.savefig(os.path.join(summary_dir, "biological_scores_summary.png"))
+                plt.close()
+            
+            print(f"Created summary plots in {summary_dir}")
+        
+        print("\nAnalysis complete! All output files are organized in folders in the 'output' directory.")
+        print("Key folders:")
+        for protein in protein_dirs:
+            print(f"- output/{protein}/ (contains alignment, phylogeny, conservation, and statistics)")
+        print("- output/summary/ (contains summary plots and files)")
+    
     except Exception as e:
         print(f"Error: {e}")
-        print("Generating and analyzing test data instead...")
+        print("Please check your internet connection and try again.")
         
-        # Generate test data and run analysis
-        test_file = generate_test_sequences()
-        run_msa_analysis("Test Protein", "Test Taxonomy", test_file)
-    
-    print("\nAnalysis complete! All output files are in the 'output' directory.")
+        # Try to generate and analyze test data if other methods fail
+        try:
+            print("Generating and analyzing test data instead...")
+            test_file = generate_test_sequences()
+            run_msa_analysis("Test Protein", "Test Taxonomy", test_file)
+        except Exception as e2:
+            print(f"Error generating test data: {e2}")

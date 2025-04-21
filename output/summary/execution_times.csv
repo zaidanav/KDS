@@ -1,0 +1,9 @@
+Protein,Method,Execution Time (s)
+cytochrome_c,simple,0.0019996166229248047
+cytochrome_c,center_star,0.0010077953338623047
+cytochrome_c,progressive,0.0009949207305908203
+histone_h4,simple,0.0010008811950683594
+histone_h4,center_star,0.0010013580322265625
+histone_h4,progressive,0.001001596450805664
+hsp70,simple,0.0020003318786621094
+hsp70,progressive,0.0009596347808837891

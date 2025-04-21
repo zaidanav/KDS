@@ -1,0 +1,9 @@
+Protein,Method,Biological Score
+cytochrome_c,simple,0.9465346534653467
+cytochrome_c,center_star,0.9465346534653467
+cytochrome_c,progressive,0.9465346534653467
+histone_h4,simple,0.9883495145631068
+histone_h4,center_star,0.9883495145631068
+histone_h4,progressive,0.9883495145631068
+hsp70,simple,1.0
+hsp70,progressive,1.0
